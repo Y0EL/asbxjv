@@ -1,25 +1,10 @@
 import os
 import streamlit as st
 import pandas as pd
-import base64
-import io
-import sys
-import subprocess
-
-# Fungsi untuk menginstal paket menggunakan pip
-def install_package(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-# Mengecek dan menginstal library deep_translator jika belum ada
-try:
-    import deep_translator
-except ImportError:
-    st.write("Mengunduh library deep_translator...")
-    install_package("deep_translator")
-    import deep_translator
-
 from deep_translator import GoogleTranslator
 from docx import Document
+import base64
+import io
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
@@ -144,13 +129,13 @@ def translate_docx_with_style(file_content, target_language="id"):
 
 def main():
     st.title("YOP2 TR")
-    st.write("Upload a file for translation.")
+    st.write("Upload File nya cuy")
     
-    uploaded_file = st.file_uploader("Choose a file...", type=["txt", "xlsx", "docx"])
+    uploaded_file = st.file_uploader("hm", type=["txt", "xlsx", "docx"])
     target_language_options = ["Arabic", "German", "Spanish", "French", "Hindi", "Indonesian", "Japanese", "Chinese"]
     target_language_codes = ["ar", "de", "es", "fr", "hi", "id", "ja", "zh-CN"]  # Updated target language codes
 
-    target_language = st.selectbox("Select Target Language", target_language_options)
+    target_language = st.selectbox("Diterjemahin kemana?", target_language_options)
 
     # Map target language to its corresponding language code
     target_language_code = target_language_codes[target_language_options.index(target_language)]
