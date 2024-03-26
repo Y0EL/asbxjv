@@ -1,10 +1,25 @@
 import os
 import streamlit as st
 import pandas as pd
-from deep_translator import GoogleTranslator
-from docx import Document
 import base64
 import io
+import sys
+import subprocess
+
+# Fungsi untuk menginstal paket menggunakan pip
+def install_package(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# Mengecek dan menginstal library deep_translator jika belum ada
+try:
+    import deep_translator
+except ImportError:
+    st.write("Mengunduh library deep_translator...")
+    install_package("deep_translator")
+    import deep_translator
+
+from deep_translator import GoogleTranslator
+from docx import Document
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
