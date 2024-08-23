@@ -3,10 +3,15 @@ import streamlit as st
 import pandas as pd
 from deep_translator import GoogleTranslator
 from docx import Document
-import base64
 import io
 from openpyxl import load_workbook
-from openpyxl.styles import Font
+import pdf2image
+import pytesseract
+from PIL import Image
+
+# Set the path to the Tesseract executable
+# Uncomment and modify the following line if Tesseract is not in your PATH
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 def translate_text(text, target_language="id"):
     translated_text = GoogleTranslator(source='auto', target=target_language).translate(text)
@@ -58,18 +63,12 @@ def save_docx_file(translated_doc, file_name):
     translated_doc.save(file_path)
     return file_path
 
-def create_download_link(file_path):
-    with open(file_path, "rb") as file:
-        b64 = base64.b64encode(file.read()).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{os.path.basename(file_path)}">Download {os.path.basename(file_path)}</a>'
-    return href
-
 def detect_foreign_language(text):
     non_ascii_count = sum(1 for char in text if ord(char) > 127)
     return non_ascii_count / len(text) > 0.8
 
-def translate_excel(file_path, target_language="id"):
-    df = pd.read_excel(file_path)
+def translate_excel(file, target_language="id"):
+    df = pd.read_excel(file)
     num_rows, num_cols = df.shape
     translated_df = pd.DataFrame(columns=df.columns)
 
@@ -78,8 +77,8 @@ def translate_excel(file_path, target_language="id"):
         for row in range(num_rows):
             cell_value = df.iloc[row, col]
             if pd.notnull(cell_value):
-                if detect_foreign_language(cell_value):
-                    translated_text = translate_text(cell_value, target_language)
+                if isinstance(cell_value, str) and detect_foreign_language(str(cell_value)):
+                    translated_text = translate_text(str(cell_value), target_language)
                     translated_col.append(translated_text)
                 else:
                     translated_col.append(cell_value)
@@ -110,11 +109,29 @@ def translate_docx_with_style(file_content, target_language="id"):
 
     return translated_doc
 
+def translate_pdf_with_ocr(file_content, target_language="id"):
+    # Convert PDF to images
+    images = pdf2image.convert_from_bytes(file_content)
+    
+    # Perform OCR on each image
+    text = ""
+    for image in images:
+        text += pytesseract.image_to_string(image)
+    
+    # Translate the extracted text
+    translated_text = translate_text(text, target_language)
+    
+    # Create a new Document with the translated text
+    translated_doc = Document()
+    translated_doc.add_paragraph(translated_text)
+    
+    return translated_doc
+
 def main():
     st.title("YOP2 TR")
     st.write("Upload File nya cuy")
     
-    uploaded_file = st.file_uploader("hm", type=["txt", "xlsx", "docx"])
+    uploaded_file = st.file_uploader("hm", type=["txt", "xlsx", "docx", "pdf"])
     target_language_options = ["Arabic", "German", "Spanish", "French", "Hindi", "Indonesian", "Japanese", "Chinese"]
     target_language_codes = ["ar", "de", "es", "fr", "hi", "id", "ja", "zh-CN"]
 
@@ -130,25 +147,32 @@ def main():
         if st.button("Proses"):
             with st.spinner("Menerjemahkan..."):
                 if file_extension == "txt":
-                    # Handle TXT file translation (implement this part)
-                    st.write("TXT translation not implemented yet.")
+                    content = uploaded_file.getvalue().decode("utf-8")
+                    translated_text = translate_text(content, target_language_code)
+                    st.session_state.translated_file_path = save_translated_file(translated_text, f"translated_{uploaded_file.name}")
                 elif file_extension == "xlsx":
-                    # Handle XLSX file translation (implement this part)
-                    st.write("XLSX translation not implemented yet.")
+                    translated_df = translate_excel(uploaded_file, target_language_code)
+                    st.session_state.translated_file_path = save_excel_file(translated_df, f"translated_{uploaded_file.name}")
                 elif file_extension == "docx":
                     translated_doc = translate_docx_with_style(uploaded_file.read(), target_language_code)
                     st.session_state.translated_file_path = save_docx_file(translated_doc, f"translated_{uploaded_file.name}")
-                    st.success("Terjemahan selesai!")
+                elif file_extension == "pdf":
+                    translated_doc = translate_pdf_with_ocr(uploaded_file.read(), target_language_code)
+                    st.session_state.translated_file_path = save_docx_file(translated_doc, f"translated_{uploaded_file.name.replace('.pdf', '.docx')}")
                 else:
-                    st.write("Format file tidak didukung. Silakan unggah file TXT, XLSX, atau DOCX.")
+                    st.write("Format file tidak didukung. Silakan unggah file TXT, XLSX, DOCX, atau PDF.")
+                
+                if st.session_state.translated_file_path:
+                    st.success("Terjemahan selesai!")
 
         if st.session_state.translated_file_path:
-            st.download_button(
-                label="Download file terjemahan",
-                data=open(st.session_state.translated_file_path, "rb").read(),
-                file_name=os.path.basename(st.session_state.translated_file_path),
-                mime="application/octet-stream"
-            )
+            with open(st.session_state.translated_file_path, "rb") as file:
+                st.download_button(
+                    label="Download file terjemahan",
+                    data=file.read(),
+                    file_name=os.path.basename(st.session_state.translated_file_path),
+                    mime="application/octet-stream"
+                )
 
 if __name__ == "__main__":
     main()
